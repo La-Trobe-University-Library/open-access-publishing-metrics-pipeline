@@ -1,0 +1,15 @@
+# Python artifacts
+__pycache__/
+*.pyc
+*.log
+.env
+venv/
+
+# Ignore everything inside data/ and output/
+data/**
+output/**
+
+# Keep the folders and subfolders, but not the files
+!data/
+!output/
+!data/**/
