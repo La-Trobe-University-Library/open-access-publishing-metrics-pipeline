@@ -54,15 +54,15 @@ open-access-publishing-and-metrics-pipeline/
 │   ├── test_measures.py
 ├── samples/
 │   ├── Cap and Link (CAUL)/
-│       ├──
+│       ├──CAUL_2025_Cap_Link_SAMPLE_FUN.xlsx
 │   ├── CiteScore (Elsevier)/
-│       ├──
+│       ├──CiteScore_2025_SAMPLE_FUN.csv
 │   ├── Journal Citation Reports (JCR)/
-│       ├──
+│       ├──JCR_2025_SAMPLE_FUN.csv
 │   ├── Journal List (CAUL)/
-│       ├──
+│       ├──CAUL_2025_Title_List_SAMPLE_FUN.xlsx
 │   ├── SCImago (Scopus)/
-│       ├──
+│       ├──SCImago_2024_SAMPLE_FUN.csv
 ├── ACKNOWLEDGEMENTS.md
 ├── LICENSE
 ├── requirements.txt
