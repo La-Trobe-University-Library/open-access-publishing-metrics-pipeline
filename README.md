@@ -33,6 +33,7 @@ The project replicates and extends a Power BI (DAX) workflow using Python and pa
 - Unit tests for loaders, measures, and utilities
 
 ## 📁 Folder Structure
+```bash
 open-access-publishing-and-metrics-pipeline/
 ├── data/                  # Optional: sample input files
 │   ├── Cap and Link (CAUL)/
@@ -68,6 +69,7 @@ open-access-publishing-and-metrics-pipeline/
 ├── README.md
 └── .gitignore
 └── setup.py
+```
 
 
 ## ⚙️ Installation
