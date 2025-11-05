@@ -80,7 +80,7 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         "Field of Research": pick,
         "Publisher Name": pick,
         "Agreement": pick,
-        "Agreement Key": pick
+        "Agreement Key": pick,
         "Journal Type": pick
     }).reset_index()
 
