@@ -81,6 +81,7 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         "Publisher Name": pick,
         "Agreement": pick,
         "Agreement Key": pick
+        "Journal Type": pick
     }).reset_index()
 
     # Add cleaned journal name for grouping
@@ -175,6 +176,7 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         "Publisher Name",
         "Agreement link",
         "Agreement type",
+        "Journal Type",
         "Field of Research (CAUL)",
         f"JIF (JCR, {jcr_year})",
         f"5-Year JIF (JCR, {jcr_year})",
