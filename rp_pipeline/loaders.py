@@ -2,6 +2,31 @@ from pathlib import Path # Import Path for handling filesystem paths
 import pandas as pd # Import pandas for data manipulation
 from rp_pipeline.utils import *  # Import utility functions from the pipeline
 
+
+# ✏️ CUSTOMIZATION: Add new loader functions for additional data sources here
+# Example: def load_doaj(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
+#    """
+#    Load DOAJ data and normalize ISSNs.
+#    Expected columns: Journal Name, ISSN, eISSN, Open Access status, Publisher.
+#    """
+#    folder = root / "DOAJ"
+#    df = concat_folder(folder, sheet_name)
+#    if df.empty:
+#        return df
+
+    # Normalize ISSNs
+#    df = unpivot_issns(df)
+
+    # Ensure expected columns exist
+#    for col in ["Journal Name", "Open Access", "Publisher"]:
+#        if col not in df.columns:
+#            df[col] = pd.NA
+
+    # Keep relevant columns
+#    keep = ["Source", "ISSN/EISSN", "Journal Name", "Open Access", "Publisher"]
+#    return df[[c for c in keep if c in df.columns]].dropna(subset=["ISSN/EISSN"]).drop_duplicates()
+
+
 # Function to load and clean CAUL journal list data
 def load_caul_journals(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
     """

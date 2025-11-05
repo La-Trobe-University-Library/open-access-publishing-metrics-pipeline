@@ -112,8 +112,359 @@ This repository includes a sample input file (CAUL_2025_Title_List_SAMPLE_FUN.xl
 To run the pipeline using this sample:
 ```pwsh
 python rp_pipeline/main.py --input-root "samples" --out "output/sample_output.csv"
+
 ```
 The output will be saved in the output/ directory as sample_output.csv.
+
+
+# ✏️ Pipeline Customization Guide
+This section explains how to customize the pipeline for your needs. Look for `# ✏️ CUSTOMIZATION` comments in the code for quick entry points.
+
+**Key files to edit:**
+- `rp_pipeline/measures.py` → For aggregation, deduplication, fallback logic.
+- `rp_pipeline/loaders.py` → For adding new data sources.
+- `README.md` → For documentation updates.
+
+
+
+##  ✏️ Adding and removing Fields to the Output
+**Where to edit:**
+- `compute_measures()` in `rp_pipeline/measures.py` → Add fields to `agg` and `final_columns`.
+
+The pipeline uses DAX-like logic to aggregate journal metadata. If you want to include additional fields (e.g., Journal Type, Notes, or any other column from CAUL or other sources) in the final output:
+
+### 1. Add the field to the aggregation step in compute_measures():
+```pwsh
+agg = merged.groupby(group_keys).agg({
+    "Journal Type": pick,  # ✅ Use FIRSTNONBLANK logic
+    "Publisher Name": pick,
+    "Agreement": pick,
+    # Add other fields here
+
+```
+
+The helper pick() function mimics Power BI’s FIRSTNONBLANK:
+```pwsh
+def pick(series):
+    val = first_nonblank(series)
+    return "N/A" if (val is None or (isinstance(val, str) and val.strip() == "")) else val
+
+```
+
+### 2. Add the field to the final column order so it appears in the CSV:
+```pwsh
+final_columns = [
+    "Journal Name",
+    "Journal Type",  # ✏️ Newly added field
+    "Journal Website",
+    "ISSN/s",
+    "Publisher Name",
+    "Agreement link",
+    "Agreement type",
+    "Field of Research (CAUL)",
+    f"JIF (JCR, {jcr_year})",
+    f"5-Year JIF (JCR, {jcr_year})",
+    f"CiteScore (Scopus, {citescore_year})",
+    f"SNIP (Scopus, {citescore_year})",
+    f"SJR (SCImago, {scimago_year})",
+    f"Best SJR Quartile (SCImago, {scimago_year})",
+    f"H-Index (SCImago, {scimago_year})",
+    f"Categories (SCImago, {scimago_year})"
+]
+
+```
+### 3. When to use pick() vs. other logic:
+- ✅ Use pick() for descriptive fields (e.g., Journal Type, Publisher Name).
+- ➕ Use numeric aggregation (e.g., mean, sum) for metrics if needed.
+- 🔗 Use concatenation for multi-valued fields (e.g., ISSNs, categories).
+
+
+## ✏️ Changing Deduplication Logic
+**Where to edit:**
+- `compute_measures()` in `rp_pipeline/measures.py` → Modify `drop_duplicates()` subset.
+
+Currently, compute_measures() deduplicates on:
+```pwsh
+out = out.drop_duplicates(subset=["Journal Name", "ISSNs by JName clean"])
+
+```
+### This means:
+- Journals with the same name and the same set of ISSNs are considered duplicates.
+- If a journal has multiple ISSNs, they are concatenated into ISSNs by JName clean before deduplication.
+
+### Why you might change this
+- If you want one row per Journal Name only, regardless of ISSNs.
+- If you want to include Publisher Name or other fields in the uniqueness check.
+- If you want to keep all rows (no deduplication).
+
+### How to change it
+Edit the subset argument in drop_duplicates() inside compute_measures():
+
+Example 1: Deduplicate by Journal Name only
+```pwsh
+out = out.drop_duplicates(subset=["Journal Name"])
+
+```
+
+Example 2: Deduplicate by Journal Name + Publisher Name
+```pwsh
+out = out.drop_duplicates(subset=["Journal Name", "Publisher Name"])
+
+```
+
+Example 3: Keep all rows (disable deduplication)
+```pwsh
+# Comment out or remove the drop_duplicates line
+# out = out.drop_duplicates(subset=["Journal Name", "ISSNs by JName clean"])
+
+```
+
+### Things to consider
+- Deduplication happens after merging all metrics, so changing this may increase row count.
+- If you remove deduplication, journals with multiple ISSNs will appear multiple times.
+- If you deduplicate too aggressively (e.g., by Journal Name only), you might lose ISSN-specific metrics.
+
+## Adding New Metrics
+**Where to edit:**
+- `compute_measures()` in `rp_pipeline/measures.py` → Add metric to `agg`, rename mapping, and `final_columns`.
+
+The pipeline dynamically renames and outputs metrics from SCImago, JCR, and CiteScore. If you want to add a new metric (e.g., Journal Citation Indicator, Eigenfactor, or any custom metric), follow these steps:
+
+### 1. Add the metric to the aggregation step
+Locate the agg dictionary in compute_measures():
+```pwsh
+agg = merged.groupby(group_keys).agg({
+    "Impact Factor": pick,
+    "5-year Impact Factor": pick,
+    "SJR": pick,
+    "H index": pick,
+    "SNIP": pick,
+    "CiteScore": pick,
+    "SJR Best Quartile": pick,
+    "Categories": pick,
+    # ✏️ Add your new metric here
+    "Journal Citation Indicator": pick,  # Example
+}).reset_index()
+
+```
+Use pick() for descriptive or single-value metrics to mimic Power BI’s FIRSTNONBLANK logic.
+
+### 2. Rename the metric for clarity
+After aggregation, metrics are renamed with year labels:
+```pwsh
+agg = agg.rename(columns={
+    "Impact Factor": f"JIF (JCR, {jcr_year})",
+    "5-year Impact Factor": f"5-Year JIF (JCR, {jcr_year})",
+    "CiteScore": f"CiteScore (Scopus, {citescore_year})",
+    "SNIP": f"SNIP (Scopus, {citescore_year})",
+    "SJR": f"SJR (SCImago, {scimago_year})",
+    "SJR Best Quartile": f"Best SJR Quartile (SCImago, {scimago_year})",
+    "H index": f"H-Index (SCImago, {scimago_year})",
+    "Categories": f"Categories (SCImago, {scimago_year})",
+    # ✏️ Add rename for your new metric
+    "Journal Citation Indicator": f"JCI (JCR, {jcr_year})"
+})
+
+```
+
+### 3. Add the metric to the final output columns
+Ensure the metric appears in the CSV by adding it to final_columns:
+```pwsh
+final_columns = [
+    "Journal Name",
+    "Journal Type",
+    "Journal Website",
+    "ISSN/s",
+    "Publisher Name",
+    "Agreement link",
+    "Agreement type",
+    "Field of Research (CAUL)",
+    f"JIF (JCR, {jcr_year})",
+    f"5-Year JIF (JCR, {jcr_year})",
+    f"CiteScore (Scopus, {citescore_year})",
+    f"SNIP (Scopus, {citescore_year})",
+    f"SJR (SCImago, {scimago_year})",
+    f"Best SJR Quartile (SCImago, {scimago_year})",
+    f"H-Index (SCImago, {scimago_year})",
+    f"Categories (SCImago, {scimago_year})",
+    f"JCI (JCR, {jcr_year})"  # ✏️ Newly added metric
+]
+
+```
+
+### 4. Things to consider
+- If the metric is numeric, you can use pick() or apply an aggregation like mean or max if multiple values exist.
+- Ensure the metric exists in the merged DataFrame before adding it to agg.
+- If the metric comes from a new data source, you’ll need to:
+    - Add it in the loader function (e.g., load_jcr()).
+    - Normalize ISSNs using unpivot_issns() for proper joins.
+
+
+## ✏️ Changing Fallback Logic for Journal Website
+**Where to edit:**
+- `compute_measures()` in `rp_pipeline/measures.py` → Modify `site_fallback()` function.
+
+The pipeline ensures that every journal has a valid website link. If the Journal Website field is missing or blank, it falls back to a Google search URL for the journal name.
+
+This logic is implemented in compute_measures():
+```pwsh
+def site_fallback(row):
+    site = row.get("Journal Website")
+    jname = row.get("Journal Name")
+    if pd.isna(site) or str(site).strip() == "" or str(site).strip().upper() == "N/A":
+        return get_google_search_url(jname)  # Default fallback
+    return site
+
+out["Journal Website"] = out.apply(site_fallback, axis=1)
+
+```
+
+### Why you might change this
+- You want to use the publisher homepage instead of Google search.
+- You want to use a custom institutional resolver or Open Access lookup.
+- You want to leave the field blank instead of adding a fallback.
+
+### How to customize it
+Edit the site_fallback() function:
+
+#### Example 1: Leave blank if missing
+```pwsh
+def site_fallback(row):
+    site = row.get("Journal Website")
+    return site if pd.notna(site) and str(site).strip() != "" else ""
+
+```
+
+#### Example 2: Use publisher homepage if available
+```pwsh
+def site_fallback(row):
+    site = row.get("Journal Website")
+    publisher = row.get("Publisher Name")
+    if pd.isna(site) or str(site).strip() == "":
+        return f"https://www.{publisher.replace(' ', '').lower()}.com"
+    return site
+
+```
+
+#### Example 3: Use an Open Access lookup service
+```pwsh
+def site_fallback(row):
+    site = row.get("Journal Website")
+    jname = row.get("Journal Name")
+    if pd.isna(site) or str(site).strip() == "":
+        return f"https://doaj.org/search/journals?ref=homepage&q={jname}"
+    return site
+
+```
+
+### Things to consider
+- Fallback logic runs after all merges, so it applies to the final dataset.
+- If you use external services (e.g., DOAJ), ensure URLs are properly encoded.
+- If you remove fallback entirely, some journals will have blank links in the output.
+
+
+## ✏️ Adding New Data Sources
+**Where to edit:**
+- `rp_pipeline/loaders.py` → Create new loader function.
+- `main.py` → Load the new dataset.
+- `compute_measures()` in `rp_pipeline/measures.py` → Merge and aggregate new fields.
+
+The pipeline is modular, so you can integrate additional datasets (e.g., DOAJ, Crossref, Unpaywall, or custom publisher lists**) by following these steps:
+
+### 1. Create a Loader Function
+Add a new function in loaders.py similar to existing ones (load_scimago(), load_jcr()):
+
+Example: load_doaj()
+```pwsh
+def load_doaj(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
+    """
+    Load DOAJ data and normalize ISSNs.
+    Expected columns: Journal Name, ISSN, eISSN, Open Access status, etc.
+    """
+    folder = root / "DOAJ"
+    df = concat_folder(folder, sheet_name)
+    if df.empty:
+        return df
+
+    # Normalize ISSNs
+    df = unpivot_issns(df)
+
+    # Ensure expected columns exist
+    for col in ["Journal Name", "Open Access", "Publisher"]:
+        if col not in df.columns:
+            df[col] = pd.NA
+
+    # Keep relevant columns
+    keep = ["Source", "ISSN/EISSN", "Journal Name", "Open Access", "Publisher"]
+    return df[[c for c in keep if c in df.columns]].dropna(subset=["ISSN/EISSN"]).drop_duplicates()
+
+```
+Key points:
+- Use concat_folder() to read all files in the folder.
+- Use unpivot_issns() to normalize ISSNs for joining.
+- Add missing columns with pd.NA for consistency.
+
+
+### 2. Add the Loader to main.py
+In main.py, load the new dataset:
+```pwsh
+doaj = load_doaj(root, args.sheet_name)
+logger.info(f">>> Loaded DOAJ: {len(doaj)} rows")
+
+```
+
+### 3. Merge in compute_measures()
+Update compute_measures() to join the new dataset:
+```pwsh
+merged = merged.merge(doaj, on="ISSN/EISSN", how="left", suffixes=("", "_DOAJ"))
+
+```
+
+### 4. Aggregate New Fields
+Add fields from the new source to the aggregation step:
+```pwsh
+agg = merged.groupby(group_keys).agg({
+    "Open Access": pick,  # From DOAJ
+    "Publisher": pick,     # From DOAJ
+    # Existing fields...
+}).reset_index()
+
+```
+
+### 5. Rename and Add to Output
+Rename the new fields for clarity:
+```pwsh
+agg = agg.rename(columns={
+    "Open Access": "Open Access (DOAJ)",
+    "Publisher": "Publisher (DOAJ)"
+})
+
+```
+
+Add them to final_columns:
+```pwsh
+final_columns += ["Open Access (DOAJ)", "Publisher (DOAJ)"]
+
+```
+
+### 6. Folder Structure
+Create a folder for the new source under data/:
+```bash
+data/
+├── DOAJ/
+│   ├── doaj_2025.csv
+```
+
+### 7. Things to Consider
+- ISSN Normalization: Always use unpivot_issns() for consistent joins.
+- Column Naming: Keep names descriptive and avoid collisions.
+- Performance: Large datasets may require optimization (e.g., chunked reading).
+- Testing: Add a unit test in tests/test_loaders.py for your new loader.
+
+### Example: Adding DOAJ
+After following these steps, your pipeline will enrich journals with Open Access status from DOAJ.
+
+
 
 
 # 📊 Sample Data: CAUL year Title List

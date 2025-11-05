@@ -45,6 +45,8 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
     merged = base.merge(scimago_df, on="ISSN/EISSN", how="left", suffixes=("", "_SC"))
     merged = merged.merge(jcr_df, on="ISSN/EISSN", how="left", suffixes=("", "_JCR"))
     merged = merged.merge(cs_df, on="ISSN/EISSN", how="left", suffixes=("", "_CS"))
+    # ✏️ CUSTOMIZATION: Merge new data source here
+    # merged = merged.merge(doaj, on="ISSN/EISSN", how="left", suffixes=("", "_DOAJ"))
 
     # Group by cleaned journal name and concatenate all ISSNs
     # Concatenate all ISSNs grouped by cleaned journal name
@@ -67,6 +69,7 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         return "N/A" if (val is None or (isinstance(val, str) and val.strip() == "")) else val
 
     # Aggregate metrics using FIRSTNONBLANK logic
+    # ✏️ CUSTOMIZATION: Add or remove fields and metrics in aggregation
     agg = merged.groupby(group_keys).agg({
         "5-year Impact Factor": pick,
         "Impact Factor": pick,
@@ -80,8 +83,9 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         "Field of Research": pick,
         "Publisher Name": pick,
         "Agreement": pick,
+        # ✏️ Add more fields from CAUL or other sources here "field name or metric": pick,
         "Agreement Key": pick,
-        "Journal Type": pick
+        "Journal Type": pick # ✏️ Newly added field
     }).reset_index()
 
     # Add cleaned journal name for grouping
@@ -104,6 +108,7 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
 
     
     # Rename to match DAX measure labels
+    # ✏️ CUSTOMIZATION: Rename new metrics for clarity
     agg = agg.rename(columns={
     "5-year Impact Factor": f"5-Year JIF (JCR, {jcr_year})",
     "Impact Factor": f"JIF (JCR, {jcr_year})",
@@ -113,6 +118,8 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
     "SJR Best Quartile": f"Best SJR Quartile (SCImago, {scimago_year})",
     "H index": f"H-Index (SCImago, {scimago_year})",
     "Categories": f"Categories (SCImago, {scimago_year})",
+    # ✏️ Add rename mapping for your new metric
+    # "Journal Citation Indicator": f"JCI (JCR, {jcr_year})"
     "Field of Research": "Field of Research (CAUL)"
     })
 
@@ -127,6 +134,8 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
     out = agg.merge(issn_concat_clean, on="JName clean", how="left")
 
     # Journal Website fallback to Google if missing
+    # ✏️ CUSTOMIZATION: Fallback logic for Journal Website
+    # Current behavior: If Journal Website is missing or blank, use Google search URL
     def site_fallback(row):
         site = row.get("Journal Website")
         jname = row.get("Journal Name")
@@ -134,7 +143,16 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
             return get_google_search_url(jname)
         return site
     # Fallback to Google search URL if Journal Website is missing
+    # Apply fallback logic
     out["Journal Website"] = out.apply(site_fallback, axis=1)
+    # Examples for customization:
+    # - Leave blank if missing:
+    #   return "" instead of get_google_search_url(jname)
+    # - Use publisher homepage:
+    #   return f"https://www.{publisher.replace(' ', '').lower()}.com"
+    # - Use Open Access lookup:
+    #   return f"https://doaj.org/search/journals?q={jname}"
+
 
     # Merge Cap and Link data using Agreement Key
     if not cap.empty and "Agreement Key" in cap.columns:
@@ -157,8 +175,15 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
 
     # Remove duplicates based on Journal Name and ISSNs by JName clean
     before = len(out)
-    # Deduplicate final output based on Journal Name and ISSNs
+    # ✏️ CUSTOMIZATION: Deduplication logic
+    # Current behavior: removes duplicates based on Journal Name + ISSNs by JName clean
+    # Change subset or disable deduplication if needed
     out = out.drop_duplicates(subset=["Journal Name", "ISSNs by JName clean"])
+    # Examples:
+    # out = out.drop_duplicates(subset=["Journal Name"])  # Deduplicate by Journal Name only
+    # out = out.drop_duplicates(subset=["Journal Name", "Publisher Name"])  # Include Publisher
+    # # Comment out the line below to keep all rows (disable deduplication)
+    # # out = out.drop_duplicates(subset=["Journal Name", "ISSNs by JName clean"])
     after = len(out)
     logger.info(f">>> Deduplicated output: {before} → {after} rows")
 
@@ -169,6 +194,7 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
     })
 
     # Define final column order for output
+    # ✏️ CUSTOMIZATION: Add or remove fields in final output columns
     final_columns = [
         "Journal Name",
         "Journal Website",
@@ -176,7 +202,8 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         "Publisher Name",
         "Agreement link",
         "Agreement type",
-        "Journal Type",
+        "Journal Type", # ✏️ Newly added field
+        # ✏️ Add new metrics or fields here "field name",
         "Field of Research (CAUL)",
         f"JIF (JCR, {jcr_year})",
         f"5-Year JIF (JCR, {jcr_year})",

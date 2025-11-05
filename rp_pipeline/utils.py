@@ -48,6 +48,16 @@ def normalise_issn(value: str) -> Optional[str]:
         return f"{digits[:4]}-{digits[4:]}".upper()
     return None
 
+
+# ✏️ CUSTOMIZATION: Add helper functions for new data sources if needed
+# Example: def clean_doaj_field(value): ...
+# Extend read_any() for DOAJ quirks
+# Example: handle semicolon-delimited CSV
+# ✏️ CUSTOMIZATION: Add DOAJ-specific cleaning
+#def clean_doaj_field(value: str) -> str:
+#    return str(value).strip().title()
+
+
 def clean_agreement_key(s: str) -> str:
     if pd.isna(s):
         return ""
@@ -57,8 +67,14 @@ def clean_agreement_key(s: str) -> str:
     s = ''.join(c for c in s if unicodedata.category(c)[0] != 'C')  # Remove control chars
     return s.upper()
 
+# ✏️ CUSTOMIZATION: Change fallback URL logic
+# Current behavior: returns a Google search URL for the journal name
+# Examples:
+# - Use DOAJ lookup: return f"https://doaj.org/search/journals?q={journal_name}"
+# - Use institutional resolver: return f"https://resolver.myuniversity.edu/?q={journal_name}"
 def get_google_search_url(journal_name: str) -> str:
     return f"https://www.google.com/search?q=Journal+{journal_name}"
+
 
 def first_nonblank(series: pd.Series):
     """DAX-like FIRSTNONBLANK: first value that is not NaN/empty string."""
