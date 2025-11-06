@@ -117,7 +117,7 @@ python rp_pipeline/main.py --input-root "samples" --out "output/sample_output.cs
 The output will be saved in the output/ directory as sample_output.csv.
 
 
-# ✏️ Pipeline Customization Guide
+# ✏️ Pipeline Customisation Guide
 This section explains how to customize the pipeline for your needs. Look for `# ✏️ CUSTOMIZATION` comments in the code for quick entry points.
 
 **Key files to edit:**
@@ -125,6 +125,32 @@ This section explains how to customize the pipeline for your needs. Look for `# 
 - `rp_pipeline/loaders.py` → For adding new data sources.
 - `README.md` → For documentation updates.
 
+#### ✏️ Updating Tests After Customisation
+When you add new fields or metrics to the pipeline (e.g., `Journal Type`, `Journal Citation Indicator`), you must also update the unit tests to reflect the new schema.
+
+**Where to edit:**
+- `tests/test_measures.py` → Update the mock CAUL DataFrame in `test_compute_measures_basic()` to include the new column(s).
+- Add assertions for any new metrics or fields in the output DataFrame.
+
+**Example:**
+```pwsh
+caul = pd.DataFrame({
+    "Journal Name": ["Test Journal"],
+    "ISSN/EISSN": ["1234-567X"],
+    "Agreement": ["Read & Publish"],
+    "Agreement Key": ["READ&PUBLISH"],
+    "Publisher Name": ["Test Publisher"],
+    "Journal Website": ["http://testjournal.com"],
+    "Field of Research": ["Library Science"],
+    "Journal Type": ["Hybrid"]  # ✏️ Newly added field
+})
+
+```
+If you add new metrics:
+- Include them in the aggregation dictionary in compute_measures().
+- Add rename mappings and include them in final_columns.
+- Update tests to assert these columns exist in the output.
+Tip: Search for test_compute_measures_basic and modify the mock data and assertions accordingly.
 
 
 ##  ✏️ Adding and removing Fields to the Output

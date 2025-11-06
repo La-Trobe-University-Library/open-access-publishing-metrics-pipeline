@@ -7,6 +7,7 @@ def test_compute_measures_basic():
         "ISSN/EISSN": ["1234-567X"],
         "Agreement": ["Read & Publish"],
         "Agreement Key": ["READ&PUBLISH"],
+        "Journal Type": ["Hybrid"],
         "Publisher Name": ["Test Publisher"],
         "Journal Website": ["http://testjournal.com"],
         "Field of Research": ["Library Science"]
