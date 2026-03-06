@@ -85,7 +85,8 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
         "Agreement": pick,
         # ✏️ Add more fields from CAUL or other sources here "field name or metric": pick,
         "Agreement Key": pick,
-        "Journal Type": pick # ✏️ Newly added field
+        "Journal Type": pick, # ✏️ Newly added field
+        "Institution": pick
     }).reset_index()
 
     # Add cleaned journal name for grouping

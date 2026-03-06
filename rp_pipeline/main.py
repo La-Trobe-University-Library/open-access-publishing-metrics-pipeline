@@ -23,8 +23,10 @@ def main():
     ap.add_argument("--jcr-year", type=int, help="Year for JCR")  # Year for Journal Citation Reports (JCR) data
     ap.add_argument("--citescore-year", type=int, help="Year for CiteScore (Elsevier)") # Year for CiteScore (Elsevier) data
     ap.add_argument("--caplink-year", type=int, help="Year for Cap and Link (CAUL)")  # Year for Cap and Link (CAUL) data
+    ap.add_argument("--institution", type=str, default=None, help="Institution name to filter CAUL Journal List by")
     args = ap.parse_args()  # Parse the command-line arguments
-
+ 
+    logger.info(f">>> Institution filter:")
     journal_list_year = args.journal_list_year or int(input("Enter Journal List (CAUL) year: ")) # Prompt user for year if not provided via command-line
     SCImago_Scopus_year = args.scimago_year or int(input("Enter SCImago (Scopus) year: ")) # Prompt user for year if not provided via command-line
     JCR_year = args.jcr_year or int(input("Enter JCR year: ")) # Prompt user for year if not provided via command-line
@@ -43,8 +45,39 @@ def main():
             # Exit with error code 2 if input root is missing
             sys.exit(2)
         
+        # ---- Detect institutions from CAUL journal list ----
+        import re
 
-        caul = load_caul_journals(root, args.sheet_name) # Load CAUL journal list data
+        raw_caul = concat_folder(root / "Journal List (CAUL)", args.sheet_name)
+
+        eligible_col = next((c for c in raw_caul.columns if "eligible" in c.lower()), None)
+
+        if eligible_col is None:
+            logger.error("No 'Eligible' column found in CAUL Journal List")
+            sys.exit(1)
+
+        institutions = set()
+
+        for cell in raw_caul[eligible_col].dropna().astype(str):
+            for inst in re.split(r"[;,]", cell):
+                name = inst.strip()
+                if name:
+                    institutions.add(name)
+
+        institutions = sorted(institutions)
+
+        print("\nAvailable institutions:\n")
+
+        for i, inst in enumerate(institutions, start=1):
+            print(f"{i}. {inst}")
+
+        choice = int(input("\nSelect institution number: "))
+        institution = institutions[choice - 1]
+
+        logger.info(f">>> Selected institution: {institution}")
+
+        # ---- Load CAUL journals filtered by institution ----
+        caul = load_caul_journals(root, args.sheet_name, institution=institution) # Load CAUL journal list data
         scim = load_scimago(root, args.sheet_name) # Load SCImago metrics data
         jcr = load_jcr(root, args.sheet_name) # Load Journal Citation Reports data
         cs = load_citescore(root, args.sheet_name) # Load CiteScore metrics data

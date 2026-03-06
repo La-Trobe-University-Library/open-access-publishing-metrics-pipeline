@@ -1,6 +1,7 @@
 from pathlib import Path # Import Path for handling filesystem paths
 import pandas as pd # Import pandas for data manipulation
 from rp_pipeline.utils import *  # Import utility functions from the pipeline
+import re
 
 
 # ✏️ CUSTOMIZATION: Add new loader functions for additional data sources here
@@ -28,7 +29,7 @@ from rp_pipeline.utils import *  # Import utility functions from the pipeline
 
 
 # Function to load and clean CAUL journal list data
-def load_caul_journals(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
+def load_caul_journals(root: Path, sheet_name: Optional[str], institution: str = "La Trobe University") -> pd.DataFrame:
     """
     Approximate the CAUL Journal List expansion from M.
     Key outputs: Journal Name, Journal Type, Journal Website, Publisher Name,
@@ -50,7 +51,7 @@ def load_caul_journals(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
         "Field of Research": "Field of Research",
         "ISSN": "ISSN",
         "eISSN": "eISSN",
-        "La Trobe University": "La Trobe University"
+        "Eligible": "Eligible"
     }
     # Ensure missing expected columns exist
     for k in colmap:
@@ -65,9 +66,16 @@ def load_caul_journals(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
     # Agreement Key(s): uppercase remove spaces
     df["Agreement Key"] = df["Agreement"].apply(clean_agreement_key)
 
-    # Filter La Trobe eligibility (D or Y)
-    df["La Trobe University"] = df["La Trobe University"].astype(str).str.strip().str.upper()
-    df = df[df["La Trobe University"] == "Y"].copy()
+    # Filter Journals eligible for selected institution
+    eligible_text = df["Eligible"].fillna("").astype(str)
+    
+    pattern = rf"\b{re.escape(institution)}\b"
+    mask = eligible_text.str.contains(pattern, case=False, na=False)
+    
+    df = df[mask].copy()
+    
+    #Track which institution was used for filtering (for debugging/inspection)
+    df["Institution"] = institution
 
     # Clean journal name
     df["JName clean"] = df["Journal Name"].apply(clean_text_upper_alnum_space)
@@ -81,7 +89,7 @@ def load_caul_journals(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
         "Source", "Journal Name", "Journal Type", "Journal Website",
         "Publisher Name", "Agreement", "Field of Research",
         "ISSN", "eISSN", "ISSN/EISSN", "Agreement Key", "Agreement Keys",
-        "La Trobe University", "JName clean"
+        "La Trobe University", "JName clean", "Eligible", "Institution"
     ]
     return df[[c for c in keep if c in df.columns]].drop_duplicates()
 
