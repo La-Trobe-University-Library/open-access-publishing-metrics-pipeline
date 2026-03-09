@@ -5,7 +5,7 @@ Other than any prior works of which it is a derivative, the copyright in this wo
 Rights of use and distribution are granted under the terms of the GNU Affero General Public License version 3 (AGPL-3.0). You should find a copy of this license in the root of the repository.
 
 # Acknowledgements
-La Trobe University Library is grateful to all who have contributed to this prooject. You can see who they are are at [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)
+La Trobe University Library is grateful to all who have contributed to this project. You can see who they are at [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)
 
 This repository does not include any external datasets. It provides a pathway to integrate the following sources, assuming appropriate access:
 
@@ -67,7 +67,7 @@ open-access-publishing-and-metrics-pipeline/
 ├── LICENSE
 ├── requirements.txt
 ├── README.md
-└── .gitignore
+|── .gitignore
 └── setup.py
 ```
 
@@ -90,7 +90,7 @@ source venv/bin/activate
 ```pwsh
 pip install -e .
 ```
-### 3. Install dependencies to the environement
+### 3. Install dependencies to the environment
 ```pwsh
 pip install -r requirements.txt
 ```
@@ -99,6 +99,86 @@ pip install -r requirements.txt
 ```pwsh
 python rp_pipeline/main.py --input-root "data" --out "output/final_rp.csv"
 ```
+### CLI arguments
+**Required**
+- `--input-root PATH` — Root folder containing the data subfolders
+- `--out PATH` — Output CSV path
+
+**Optional**
+- `--sheet-name NAME` — Excel sheet to read (defaults to first sheet)
+- `--journal-list-year INT` — Year for CAUL Journal List
+- `--scimago-year INT` — Year for SCImago (SCImago/SJR export)
+- `--jcr-year INT` — Year for Journal Citation Reports (JCR)
+- `--citescore-year INT` — Year for CiteScore (Elsevier)
+- `--caplink-year INT` — Year for Cap & Link (CAUL)
+- `--institution "Name"` — Institution filter (if omitted, you will select from a detected list)
+
+If any year is omitted, the script runs **interactively** and prompts you for the missing values.
+
+### ⚙️ Interactive vs Non‑Interactive Use
+
+The pipeline can run in **two modes**, depending on whether you include the year arguments on the command line.
+
+#### 1. Non‑interactive mode (recommended for automation)
+If you supply all year parameters (`--journal-list-year`, `--scimago-year`, `--jcr-year`, `--citescore-year`, `--caplink-year`), the pipeline will run from start to finish without asking any questions.
+
+This example runs fully non‑interactively:
+
+```pwsh
+python rp_pipeline/main.py \
+    --input-root "data" \
+    --out "output/final_rp.csv" \
+    --journal-list-year 2025 \
+    --scimago-year 2024 \
+    --jcr-year 2024 \
+    --citescore-year 2024 \
+    --caplink-year 2025
+```
+
+#### 2. Interactive mode (default when arguments are missing)
+If you omit any of the year flags, `main.py` will pause and prompt you to enter the missing values.  
+This behaviour comes directly from the script logic, which asks the user for:
+
+- Journal List (CAUL) year  
+- SCImago (Scopus) year  
+- JCR year  
+- CiteScore year  
+- Cap & Link year  
+  (All via `input()` if not provided on the command line)
+
+After loading the CAUL Journal List, the script will also:
+
+- Detect all institutions listed in the **Eligible** column  
+- Display them as a numbered menu  
+- Prompt you to select the institution to filter by
+
+This ensures the pipeline can run even if you do not provide every parameter up front, but it does require manual input.
+
+### 🏫 Institution Selection
+When running the pipeline, the CAUL Journal List is scanned for all institutions mentioned in the **Eligible** column.  
+A numbered menu is then displayed, and you will be prompted to choose one.
+
+This selected institution is used to filter the CAUL dataset.  
+The actual filtering occurs inside:
+
+```python
+load_caul_journals(..., institution=...)
+```
+
+If you supply `--institution "<Name>"` on the command line and it matches a detected institution, the prompt is skipped.
+
+### 📌 About year‑dependent column names
+The pipeline automatically labels metric columns using the years you provide.  
+For example, if you run with `--jcr-year 2024`, your output will contain:
+
+- `JIF (JCR, 2024)`
+- `5-Year JIF (JCR, 2024)`
+- `CiteScore (Scopus, 2024)`
+- `SNIP (Scopus, 2024)`
+- `SJR (SCImago, 2024)`
+- `H-Index (SCImago, 2024)`
+  
+These names will change automatically if you supply different years.
 
 ## 🧪 Testing
 ```pwsh
@@ -106,8 +186,12 @@ pytest tests/
 ```
 
 # 🧪 Running with Sample Data
-
-This repository includes a sample input file (CAUL_2025_Title_List_SAMPLE_FUN.xlsx) located in the data/ folder. This file mimics vendor-supplied journal metadata but uses humorous and fictional journal titles for testing and demonstration purposes.
+This repository includes sample input files under the `samples/` directory.
+For example:
+```
+samples/Journal List (CAUL)/CAUL_2025_Title_List_SAMPLE_FUN.xlsx
+```
+These files mimic vendor‑supplied journal metadata using humorous and fictional journal titles for safe testing.
 
 To run the pipeline using this sample:
 ```pwsh
@@ -722,14 +806,14 @@ This file tracks whether each CAUL Read & Publish agreement is capped or uncappe
 - The publisher data submission form
 - The approval statistics dashboard
 
-📁 File sample Location:
+📁 File sample location:
 ```pwsh
-samples/SCImago (Scopus)/SCImago_2024_SAMPLE_FUN.csv
+samples/Cap and Link (CAUL)/CAUL_2025_Cap_Link_SAMPLE_FUN.xlsx
 ```
 
-📁 Your File Location: (any name on the file as it uses the folder)
+📁 Your file location (any filename is accepted as long as it is inside the folder):
 ```pwsh
-data/SCImago (Scopus)/SCImago_2024.csv
+data/Cap and Link (CAUL)/CAUL_Cap_and_Link.xlsx
 ```
 
 ## 🧾 Description
