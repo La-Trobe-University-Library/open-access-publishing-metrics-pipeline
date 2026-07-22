@@ -7,10 +7,18 @@ venv/
 rp_pipeline.egg-info/
 *.egg-info/
 
-# Ignore everything inside data/ and output/
+# Ignore input and output data
+data/**
+output/**
 
-
-# Keep the folders and subfolders, but not the files
+# Keep folder structure
 !data/
 !output/
+
+# Keep subfolders
 !data/**/
+!output/**/
+
+# Keep placeholder files only
+!data/.gitkeep
+!output/.gitkeep

@@ -44,9 +44,19 @@ def normalise_issn(value: str) -> Optional[str]:
         return f"{m.group(1)}-{m.group(2)}".upper()
     # sometimes ISSNs are stored like '12345678' or '1234 5678'
     digits = re.sub(r'[^0-9Xx]', '', s)
+
+    # Recover leading zeros stripped by Excel
+    if not digits:
+        return None
+
+    if len(digits) < 8:
+        digits = digits.zfill(8)
+
     if len(digits) == 8:
         return f"{digits[:4]}-{digits[4:]}".upper()
+
     return None
+
 
 
 # ✏️ CUSTOMIZATION: Add helper functions for new data sources if needed
@@ -111,11 +121,11 @@ def read_any(path, sheet_name=None):
         try:
             if sheet_name is None:
                 # Read all sheets and pick the first one
-                xls = pd.read_excel(path, sheet_name=None, engine="openpyxl" if path.suffix.lower() == ".xlsx" else "xlrd")
+                xls = pd.read_excel(path, sheet_name=None, dtype=str, engine="openpyxl" if path.suffix.lower() == ".xlsx" else "xlrd")
                 first_sheet = next(iter(xls.values()))
                 return first_sheet
             else:
-                return pd.read_excel(path, sheet_name=sheet_name, engine="openpyxl" if path.suffix.lower() == ".xlsx" else "xlrd")
+                return pd.read_excel(path, sheet_name=sheet_name, dtype=str, engine="openpyxl" if path.suffix.lower() == ".xlsx" else "xlrd")
         except (ValueError, FileNotFoundError, pd.errors.ExcelFileError) as e:
             logger.error(f"Error reading Excel file {path.name}: {e}")
             raise
@@ -161,7 +171,33 @@ def unpivot_issns(df: pd.DataFrame) -> pd.DataFrame:
     df["ISSN/EISSN"] = df["ISSN/EISSN"].astype(str).str.split(",")
     df = df.explode("ISSN/EISSN", ignore_index=True)
 
+    # Keep original values for QA reporting
+    original_issns = df["ISSN/EISSN"].copy()
+
     # Normalize
     df["ISSN/EISSN"] = df["ISSN/EISSN"].apply(normalise_issn)
+
+    invalid_mask = df["ISSN/EISSN"].isna()
+
+    invalid = invalid_mask.sum()
+    total = len(df)
+
+    logger.info(
+        f"ISSN normalisation complete: {total - invalid:,} valid, {invalid:,} invalid"
+    )
+
+    if invalid:
+        invalid_examples = (
+            original_issns[invalid_mask]
+            .fillna("<NULL>")
+            .astype(str)
+            .value_counts()
+            .head(20)
+        )
+
+        logger.info(
+            "Top invalid ISSN values:\n%s",
+            invalid_examples.to_string()
+        )
 
     return df

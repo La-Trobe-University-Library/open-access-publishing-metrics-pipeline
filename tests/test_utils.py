@@ -28,3 +28,8 @@ def test_ensure_numeric():
     result = ensure_numeric(s)
     assert result[0] == 1.234
     assert pd.isna(result[2])
+
+def test_normalise_issn_leading_zero_recovery():
+    assert normalise_issn("868756") == "0086-8756"
+    assert normalise_issn("9876543") == "0987-6543"
+    assert normalise_issn("1234567X") == "1234-567X"

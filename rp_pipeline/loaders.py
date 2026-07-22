@@ -156,12 +156,16 @@ def load_citescore(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
     keep = ["Source", "ISSN/EISSN", "CiteScore", "SNIP", "Title", "Open Access"]
     return df[[c for c in keep if c in df.columns]].dropna(subset=["ISSN/EISSN"]).drop_duplicates()
 
+
 # Function to load Cap and Link metadata for inspection
 def load_cap_and_link(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
-    """Optional: load 'Cap and Link (CAUL)' Table1 if present; returned for inspection only."""
+    """Optional: load 'Cap and Link (CAUL)' table if present; returned for enrichment."""
     folder = root / "Cap and Link (CAUL)"
     df_all = []
+
     for p in sorted(folder.glob("*")):
+        df = None
+
         if p.suffix.lower() in {".xlsx", ".xls"}:
             try:
                 xls = pd.read_excel(p, sheet_name=None)
@@ -169,15 +173,32 @@ def load_cap_and_link(root: Path, sheet_name: Optional[str]) -> pd.DataFrame:
                 df = xls[first_name]
             except Exception:
                 df = pd.read_excel(p, sheet_name=sheet_name)
-    
-            df["Source"] = p.stem
-            df["Agreement Key"] = df["Agreement"].apply(clean_agreement_key)
-            df_all.append(df)
+
         elif p.suffix.lower() == ".csv":
             df = pd.read_csv(p)
-            df["Source"] = p.stem
-            df_all.append(df)
-            df["Agreement Key"] = df["Agreement"].apply(clean_agreement_key)
+
+        if df is None:
+            continue
+
+        df["Source"] = p.stem
+
+        # Ensure Agreement exists
+        if "Agreement" not in df.columns:
+            df["Agreement"] = pd.NA
+
+        # ✅ Normalise common HTML entity so keys match CAUL ("&amp;" -> "&")
+        df["Agreement"] = df["Agreement"].astype(str).str.replace("&amp;", "&", regex=False)
+
+        # Agreement Key used for merges
+        df["Agreement Key"] = df["Agreement"].apply(clean_agreement_key)
+
+        # (Optional) ensure Journal Type exists if you added it to Cap & Link
+        if "Journal Type" not in df.columns:
+            df["Journal Type"] = pd.NA
+
+        df_all.append(df)
+
     if not df_all:
         return pd.DataFrame()
+
     return pd.concat(df_all, ignore_index=True)

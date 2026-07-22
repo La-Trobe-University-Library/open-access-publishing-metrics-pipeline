@@ -154,25 +154,90 @@ def compute_measures(caul_df: pd.DataFrame, scimago_df: pd.DataFrame, jcr_df: pd
     # - Use Open Access lookup:
     #   return f"https://doaj.org/search/journals?q={jname}"
 
+    
+    # Merge Cap and Link data using Agreement Key + Journal Type
+    # Rule: blank Journal Type rows in Cap & Link only apply when CAUL Journal Type is missing
+    if not cap.empty:
+        # Ensure Agreement Key exists and is consistent
+        if "Agreement" in out.columns:
+            out["Agreement Key"] = out["Agreement"].apply(clean_agreement_key)
+        else:
+            logger.info("⚠️ 'Agreement' missing in output — Cap & Link merge skipped.")
+            return out
 
-    # Merge Cap and Link data using Agreement Key
-    if not cap.empty and "Agreement Key" in cap.columns:
-        cap["Agreement Key"] = cap["Agreement"].astype(str).str.replace(r"\s+", "", regex=True).str.upper()
-        cap_clean = cap[[
+        if "Agreement" in cap.columns:
+            cap["Agreement Key"] = cap["Agreement"].apply(clean_agreement_key)
+        else:
+            logger.info("⚠️ 'Agreement' missing in Cap & Link — merge skipped.")
+            return out
+
+        # Ensure Journal Type exists on both sides
+        if "Journal Type" not in out.columns:
+            out["Journal Type"] = pd.NA
+        if "Journal Type" not in cap.columns:
+            cap["Journal Type"] = pd.NA
+
+        # Treat N/A-like tokens as missing
+        MISSING_JT = {"", "n/a", "na", "nan", "none", "null"}
+
+        # Build normalised Journal Type keys
+        out["Journal Type Key"] = out["Journal Type"].astype(str).str.strip().str.lower()
+        out.loc[out["Journal Type"].isna(), "Journal Type Key"] = ""
+        out.loc[out["Journal Type Key"].isin(MISSING_JT), "Journal Type Key"] = ""
+
+        cap["Journal Type Key"] = cap["Journal Type"].astype(str).str.strip().str.lower()
+        cap.loc[cap["Journal Type"].isna(), "Journal Type Key"] = ""
+        cap.loc[cap["Journal Type Key"].isin(MISSING_JT), "Journal Type Key"] = ""
+
+        # Keep only relevant Cap & Link columns that exist
+        wanted = [
             "Agreement Key",
+            "Journal Type Key",
             "Agreement type",
             "Link",
             "Publisher data",
-            "Capped agreement approval statistics"
-        ]].drop_duplicates()
+            "Capped agreement approval statistics",
+        ]
+        cap_clean = cap[[c for c in wanted if c in cap.columns]].drop_duplicates()
 
-        # Merge Cap and Link metadata using Agreement Key
-        if "Agreement Key" in out.columns:
-            out = out.merge(cap_clean, on="Agreement Key", how="left")
-        else:
-            logger.info("⚠️ 'Agreement Key' missing in output — Cap & Link merge skipped.")
+        cap_specific = cap_clean[cap_clean["Journal Type Key"] != ""].copy()
+        cap_blankjt = cap_clean[cap_clean["Journal Type Key"] == ""].copy()
+
+        # 1) Exact match on (Agreement Key + Journal Type Key)
+        if not cap_specific.empty:
+            out = out.merge(
+                cap_specific,
+                on=["Agreement Key", "Journal Type Key"],
+                how="left",
+                suffixes=("", "_cap"),
+            )
+
+
+        # 2) Fallback match on Agreement Key ONLY for rows where CAUL Journal Type is missing
+        if not cap_blankjt.empty:
+            missing_jt_mask = out["Journal Type Key"] == ""
+            if missing_jt_mask.any():
+                subset_idx = out.index[missing_jt_mask]
+
+                fb = out.loc[missing_jt_mask, ["Agreement Key"]].merge(
+                    cap_blankjt.drop(columns=["Journal Type Key"]),
+                    on="Agreement Key",
+                    how="left",
+                )
+
+                # 🔑 align indices so combine/fill works by row
+                fb.index = subset_idx
+
+                for col in ["Agreement type", "Link", "Publisher data", "Capped agreement approval statistics"]:
+                    if col in fb.columns:
+                        if col not in out.columns:
+                            out[col] = pd.NA
+                        out.loc[missing_jt_mask, col] = out.loc[missing_jt_mask, col].combine_first(fb[col])
+
     else:
         logger.info("⚠️ Cap & Link data missing or malformed — merge skipped.")
+
+
 
     # Remove duplicates based on Journal Name and ISSNs by JName clean
     before = len(out)
